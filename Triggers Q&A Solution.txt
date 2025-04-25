@@ -41,3 +41,40 @@ public class ContactTriggerHandler {
     
     }
 }
+
+
+Q.2. Write a trigger to prevent the deletion of opportunities that are closed and have associated with OpportunityLineItems.
+
+
+trigger PreventClosedOpportunityDeletion on Opportunity (before delete) {
+    if (Trigger.isBefore && Trigger.isDelete) {
+        OpportunityTriggerHandler.PreventClosedOpportunityDeletion(Trigger.old);
+    }
+
+}
+
+public class OpportunityTriggerHandler {
+    public static void PreventClosedOpportunityDeletion(List<Opportunity> oldOpps) {
+        Set<Id> oppIdsToCheck = new Set<Id>();
+        Map<Id, Opportunity> closedOppsMap = new Map<Id, Opportunity>();
+        for (Opportunity opp : oldOpps) {
+            if (opp.IsClosed) {
+                oppIdsToCheck.add(opp.Id);
+                closedOppsMap.put(opp.Id, opp);
+            }
+        }
+        if (!oppIdsToCheck.isEmpty()) {
+
+            Set<Id> oppsWithProducts = new Set<Id>();
+            for (OpportunityLineItem oli : [SELECT OpportunityId FROM OpportunityLineItem WHERE OpportunityId IN :oppIdsToCheck]) {
+                oppsWithProducts.add(oli.OpportunityId);
+            }
+            for (Id oppId : oppsWithProducts) {
+                if (closedOppsMap.containsKey(oppId)) {
+                    closedOppsMap.get(oppId).addError('You cannot delete this closed opportunity with associated line items.');
+                }
+            }
+        }
+
+    }  
+}
