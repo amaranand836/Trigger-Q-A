@@ -1,4 +1,4 @@
-Q1. Write an Apex Trigger to update the custom field Number_of_Contacts__c on the Account object with the total number of related Contact records
+Q.1. Write an Apex Trigger to update the custom field Number_of_Contacts__c on the Account object with the total number of related Contact records
 
 trigger ContactTrigger on Contact (after insert, after update, after delete, after undelete) {
     if (Trigger.isAfter) {
@@ -45,7 +45,6 @@ public class ContactTriggerHandler {
 
 Q.2. Write a trigger to prevent the deletion of opportunities that are closed and have associated with OpportunityLineItems.
 
-
 trigger PreventClosedOpportunityDeletion on Opportunity (before delete) {
     if (Trigger.isBefore && Trigger.isDelete) {
         OpportunityTriggerHandler.PreventClosedOpportunityDeletion(Trigger.old);
@@ -76,5 +75,35 @@ public class OpportunityTriggerHandler {
             }
         }
 
+    }  
+}
+
+Q.3. Write a trigger to update the Account's Last_Contacted_Date__c field with the current date when a new Contact is created or updated.
+
+trigger UpdateLastContactedDate on Contact (after insert, after update) {
+    if (Trigger.isAfter && (Trigger.isInsert || Trigger.isUpdate)) {
+        ContactTriggerHandler.updateLastContactedDate(Trigger.new);
+    }
+}
+
+public class ContactTriggerHandler {
+    public static void updateLastContactedDate(List<Contact> newContacts) {
+        Set<Id> accountIds = new Set<Id>();
+        for (Contact con : newContacts) {
+            if (con.AccountId != null) {
+                accountIds.add(con.AccountId);
+            }
+        }
+
+        if (!accountIds.isEmpty()) {
+            List<Account> accountsToUpdate = new List<Account>();
+            for (Account acc : [SELECT Id, Last_Contacted_Date__c FROM Account WHERE Id IN :accountIds]) {
+                acc.Last_Contacted_Date__c = System.today();
+                accountsToUpdate.add(acc);
+            }
+            if (!accountsToUpdate.isEmpty()) {
+                update accountsToUpdate;
+            }
+        }
     }  
 }
