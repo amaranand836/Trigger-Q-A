@@ -158,3 +158,86 @@ public class CaseTriggerHandler {
         }
     }  
 }
+
+Q.6. Scenario: Update Case Count on Account Based on Case Record Type
+You are working on a Salesforce org where Accounts can have multiple Cases related to them. These cases can be of different types, such as:
+
+Technical_Support
+Customer_Complaint
+
+Each of these is defined using Record Types on the Case object.
+Your client wants to track the number of cases for each type directly on the Account record using two custom number fields:
+
+Technical_Support_Cases__c (Number field on Account)
+Customer_Complaint_Cases__c (Number field on Account)
+
+trigger CaseCountTrigger on Case (after insert, after update, after delete, after undelete) {
+    if (Trigger.isInsert || Trigger.isUpdate || Trigger.isDelete || Trigger.isUndelete) {
+        CaseCountHandler.updateAccountCaseCounts(Trigger.new, Trigger.old, Trigger.isInsert, Trigger.isUpdate, Trigger.isDelete, Trigger.isUndelete);
+    }
+}
+
+public class CaseCountHandler {
+    public static void updateAccountCaseCounts(List<Case> newCases, List<Case> oldCases, Boolean isInsert, Boolean isUpdate, Boolean isDelete, Boolean isUndelete) {
+        Set<Id> accountIds = new Set<Id>();
+
+        // Collect AccountIds from new and old cases
+        if (isInsert || isUpdate || isUndelete) {
+            for (Case cs : newCases) {
+                if (cs.AccountId != null) {
+                    accountIds.add(cs.AccountId);
+                }
+            }
+        }
+
+        if (isDelete || isUpdate || isUndelete) {
+            for (Case cs : oldCases) {
+                if (cs.AccountId != null) {
+                    accountIds.add(cs.AccountId);
+                }
+            }
+        }
+
+        // If no accounts to update, exit early
+        if (accountIds.isEmpty()) return;
+
+        // Aggregate count of cases by AccountId and RecordTypeId
+        AggregateResult[] groupedResults = [
+            SELECT AccountId, RecordTypeId, COUNT(Id) caseCount
+            FROM Case
+            WHERE AccountId IN :accountIds
+            GROUP BY AccountId, RecordTypeId
+        ];
+
+        // Map to hold account updates
+        Map<Id, Account> accountsMap = new Map<Id, Account>();
+
+        // Initialize the account map with existing account data
+        for (Account acc : [SELECT Id, Technical_Support_Cases__c, Customer_Complaint_Cases__c FROM Account WHERE Id IN :accountIds]) {
+            accountsMap.put(acc.Id, acc);
+        }
+
+        // Loop through AggregateResult and update the account fields
+        for (AggregateResult ar : groupedResults) {
+            Id accId = (Id) ar.get('AccountId');
+            Id rtId = (Id) ar.get('RecordTypeId');
+            Integer count = (Integer) ar.get('caseCount');
+
+            // Get the RecordTypeName dynamically
+            String rtName = Schema.SObjectType.Case.getRecordTypeInfosById().get(rtId).getName();
+
+            Account acc = accountsMap.get(accId);
+
+            // Update the custom fields based on RecordType
+            if (rtName == 'Technical_Support') {
+                acc.Technical_Support_Cases__c = count;
+            } else if (rtName == 'Customer_Complaint') {
+                acc.Customer_Complaint_Cases__c = count;
+            }
+        }
+
+        // Update the accounts in one DML statement
+        update accountsMap.values();
+    }
+}
+
