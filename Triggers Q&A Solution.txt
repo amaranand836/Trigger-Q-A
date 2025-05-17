@@ -1,44 +1,41 @@
-Q.1. Write an Apex Trigger to update the custom field Number_of_Contacts__c on the Account object with the total number of related Contact records
+Q.1. Write an Apex Trigger to update the custom field Contact_Count__c on the Account object with the total count of related Contact records.
 
 trigger ContactTrigger on Contact (after insert, after update, after delete, after undelete) {
-    if (Trigger.isAfter) {
-        if (Trigger.isInsert || Trigger.isUpdate || Trigger.isDelete || Trigger.isUndelete) {
-            ContactTriggerHandler.updateContactCount(Trigger.new, Trigger.old, Trigger.isInsert, Trigger.isUpdate, Trigger.isDelete, Trigger.isUndelete);
-        }
+    if (Trigger.isinsert || Trigger.isupdate || trigger.isdelete || Trigger.isundelete) {
+        ContactTriggerHandler.updateContactCount(Trigger.new, Trigger.old);
     }
 }
 
 
 public class ContactTriggerHandler {
-    public static void updateContactCount(List<Contact> newContacts, List<Contact> oldContacts, Boolean isInsert, Boolean isUpdate, Boolean isDelete, Boolean isUndelete) {
+    public static void updateContactCount(List<Contact> newContacts, List<Contact> oldContacts) {
         Set<Id> accountIds = new Set<Id>();
-        if (isInsert || isUpdate || isUndelete) {
+        if(newContacts != null){
             for (Contact con : newContacts) {
                 if (con.AccountId != null) {
                     accountIds.add(con.AccountId);
                 }
             }
         }
-        if (isDelete || isUpdate || isUndelete) {
+        if(oldContacts != null){
             for (Contact cont : oldContacts) {
                 if (cont.AccountId != null) {
                     accountIds.add(cont.AccountId);
                 }
             }
         }
-
         if (!accountIds.isEmpty()) {
-            List<Account> accountsToUpdate = List<Account>();
-
-            for (Account acc : [SELECT Id, Number_of_Contacts__c, (SELECT Id FROM Contacts) FROM Account WHERE Id IN :accountIds]) {
-                acc.Number_of_Contacts__c = acc.Contacts.size();
+            List<Account> accountsToUpdate = new List<Account>();
+            
+            for (Account acc : [SELECT Id, Contact_Count__c, (SELECT Id FROM Contacts) FROM Account WHERE Id IN :accountIds]) {
+                acc.Contact_Count__c = acc.Contacts.size();
                 accountsToUpdate.add(acc);
             }
-             if (!accountsToUpdate.isEmpty()) {
+            if (!accountsToUpdate.isEmpty()) {
                 update accountsToUpdate;
             }
-    }
-    
+        } 
+        
     }
 }
 
